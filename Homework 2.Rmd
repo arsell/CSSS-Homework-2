@@ -1,0 +1,145 @@
+---
+title: "Homework 2"
+author: "Austin Sell"
+date: "April 19, 2018"
+output: pdf_document
+---
+
+```{r}
+data <- read.csv("Data/congress.csv")
+attach(data)
+library(tseries)
+library(pander)
+library(forecast)
+options(digits = 3)
+```
+
+```{r functions, echo=FALSE}
+# ARIMA Cross-validation by rolling windows
+# Adapted from Rob J Hyndman's code:
+# http://robjhyndman.com/hyndsight/tscvexample/
+#
+# Could use further generalization, e.g. to seasonality
+# Careful!  This can produce singularities using categorical covariates
+arimaCV <- function(x, order, xreg, include.mean, forward=1, minper=50, seasonal=NULL) {
+    require(forecast)
+    if (!any(class(x)=="ts")) x <- ts(x)
+    n <- length(x)
+    mae <- matrix(NA, nrow=n-minper, ncol=forward)
+    st <- tsp(x)[1]+(minper-2)
+    for(i in 1:(n-minper)) {
+        xshort <- window(x, start=st+(i-minper+1), end=st+i)
+        xnext <- window(x, start=st+(i+1), end=min(n, st+(i+forward)))
+        xregshort <- window(xreg, start=st+(i-minper+1), end=st+i)
+        xregnext <- window(xreg, start=st+(i+1), end=min(n, st+(i+forward)))
+        fit <- Arima(xshort, order=order, seasonal=seasonal, xreg=xregshort, include.mean=include.mean)
+        fcast <- forecast(fit, h=length(xnext), xreg=xregnext)
+        mae[i,1:length(xnext)] <- abs(fcast[['mean']]-xnext)
+    }
+    colMeans(mae, na.rm=TRUE)
+}
+```
+
+# Question 1
+
+## Part A
+
+```{r}
+plot(Congress, DemHouseMaj, type="l")
+
+acf(DemHouseMaj)
+pacf(DemHouseMaj)
+
+adf.test(DemHouseMaj)
+PP.test(DemHouseMaj)
+
+pre1994 <- data[StartYear<1994,]
+post1994 <- data[StartYear>1994,]
+pre1994$DemHouseMaj <- pre1994$DemHouseMaj - mean(pre1994$DemHouseMaj)
+post1994$DemHouseMaj <- post1994$DemHouseMaj - mean(post1994$DemHouseMaj)
+new.data <- rbind(pre1994, post1994)
+
+attach(new.data)
+
+plot(Congress, DemHouseMaj, type="l")
+acf(DemHouseMaj)
+pacf(DemHouseMaj)
+```
+
+## Part B
+
+```{r}
+xcovariates <- cbind(PartisanMidterm, PartisanUnem, Coattails, Pre1994)
+ar0 <- arima(DemHouseMaj, order = c(0,0,0),
+             xreg = xcovariates, include.mean = TRUE)
+```
+
+Table: Model Evaluation
+
+Model Components | AIC | $\hat{\sigma}^2$ | $N$ | $\hat{\beta}_{PM}$ | $\hat{\beta}_{PU}$ | $\hat{\beta}_{CT}$ | $\hat{\beta}_{1994}$ | 
+------------------|-----|-----|---|-----|-----|-----|-----|
+AR(0) | `r ar0$aic` | `r ar0$sigma2` | `r length(DemHouseMaj)` | `r ar0$coef["PartisanMidterm"]` | `r ar0$coef["PartisanUnem"]` | `r ar0$coef["Coattails"]` | `r ar0$coef["Pre1994"]` |
+&nbsp; | &nbsp; | &nbsp; | &nbsp; | (`r sqrt(diag(ar0$var.coef))["PartisanMidterm"]`) | (`r sqrt(diag(ar0$var.coef))["PartisanUnem"]`) | (`r sqrt(diag(ar0$var.coef))["Coattails"]`) | (`r sqrt(diag(ar0$var.coef))["Pre1994"]`) |
+
+
+
+
+## Part C
+
+```{r}
+ar1 <- arima(DemHouseMaj, order = c(1,0,0),
+             xreg = xcovariates, include.mean = TRUE)
+
+ar2 <- arima(DemHouseMaj, order = c(2,0,0),
+             xreg = xcovariates, include.mean = TRUE)
+
+ma1 <- arima(DemHouseMaj, order = c(0,0,1),
+             xreg = xcovariates, include.mean = TRUE)
+
+arma11 <- arima(DemHouseMaj, order = c(1,0,1),
+             xreg = xcovariates, include.mean = TRUE)
+```
+
+Table: Model Comparison
+
+Model Components | AIC | $\hat{\sigma}^2$ | $N$ | $\hat{\beta}_{PM}$ | $\hat{\beta}_{PU}$ | $\hat{\beta}_{CT}$ | $\hat{\beta}_{1994}$ | 
+------------------|-----|-----|---|-----|-----|-----|-----|
+AR(0) | `r ar0$aic` | `r ar0$sigma2`| `r length(DemHouseMaj)` | `r ar0$coef["PartisanMidterm"]` | `r ar0$coef["PartisanUnem"]` | `r ar0$coef["Coattails"]` | `r ar0$coef["Pre1994"]` |
+&nbsp; | &nbsp; | &nbsp; | &nbsp; | (`r sqrt(diag(ar0$var.coef))["PartisanMidterm"]`) | (`r sqrt(diag(ar0$var.coef))["PartisanUnem"]`) | (`r sqrt(diag(ar0$var.coef))["Coattails"]`) | (`r sqrt(diag(ar0$var.coef))["Pre1994"]`) |
+AR(1) | `r ar1$aic` | `r ar1$sigma2` | `r length(DemHouseMaj)` | `r ar1$coef["PartisanMidterm"]` | `r ar1$coef["PartisanUnem"]` | `r ar1$coef["Coattails"]` | `r ar1$coef["Pre1994"]` |
+&nbsp; | &nbsp; | &nbsp; | &nbsp; | (`r sqrt(diag(ar1$var.coef))["PartisanMidterm"]`) | (`r sqrt(diag(ar1$var.coef))["PartisanUnem"]`) | (`r sqrt(diag(ar1$var.coef))["Coattails"]`) | (`r sqrt(diag(ar1$var.coef))["Pre1994"]`) |
+AR(2) | `r ar0$aic` | `r ar2$sigma2` | `r length(DemHouseMaj)` | `r ar2$coef["PartisanMidterm"]` | `r ar2$coef["PartisanUnem"]` | `r ar2$coef["Coattails"]` | `r ar2$coef["Pre1994"]` |
+&nbsp; | &nbsp; | &nbsp; | &nbsp; | (`r sqrt(diag(ar2$var.coef))["PartisanMidterm"]`) | (`r sqrt(diag(ar2$var.coef))["PartisanUnem"]`) | (`r sqrt(diag(ar2$var.coef))["Coattails"]`) | (`r sqrt(diag(ar2$var.coef))["Pre1994"]`) |
+MA(1) | `r ma1$aic` | `r ma1$sigma2` | `r length(DemHouseMaj)` | `r ma1$coef["PartisanMidterm"]` | `r ma1$coef["PartisanUnem"]` | `r ma1$coef["Coattails"]` | `r ma1$coef["Pre1994"]` |
+&nbsp; | &nbsp; | &nbsp; | &nbsp; | (`r sqrt(diag(ma1$var.coef))["PartisanMidterm"]`) | (`r sqrt(diag(ma1$var.coef))["PartisanUnem"]`) | (`r sqrt(diag(ma1$var.coef))["Coattails"]`) | (`r sqrt(diag(ma1$var.coef))["Pre1994"]`) |
+ARMA(1,1) | `r arma11$aic` | `r arma11$sigma2` | `r length(DemHouseMaj)` | `r arma11$coef["PartisanMidterm"]` | `r arma11$coef[3]` | `r arma11$coef["Coattails"]` | `r arma11$coef["Pre1994"]` |
+&nbsp; | &nbsp; | &nbsp; | &nbsp; | (`r sqrt(diag(arma11$var.coef))["PartisanMidterm"]`) | (`r sqrt(diag(arma11$var.coef))["PartisanUnem"]`) | (`r sqrt(diag(arma11$var.coef))["Coattails"]`) | (`r sqrt(diag(arma11$var.coef))["Pre1994"]`) |
+
+## Part D
+
+```{r}
+ar0.cv <- arimaCV(DemHouseMaj, order = c(0,0,0), forward=3,
+                  xreg=xcovariates, include.mean = TRUE, minper = 20)
+
+ar1.cv <- arimaCV(DemHouseMaj, order = c(1,0,0), forward=3,
+                  xreg=xcovariates, include.mean = TRUE, minper = 20)
+
+ar2.cv <- arimaCV(DemHouseMaj, order = c(2,0,0), forward=3,
+                  xreg=xcovariates, include.mean = TRUE, minper = 20)
+
+ma1.cv <- arimaCV(DemHouseMaj, order = c(0,0,1), forward=3,
+                  xreg=xcovariates, include.mean = TRUE, minper = 20)
+
+arma11.cv <- arimaCV(DemHouseMaj, order = c(1,0,1), forward=3,
+                  xreg=xcovariates, include.mean = TRUE, minper = 20)
+```
+
+Table: Model Comparison
+
+| Model Components | AIC | RMSE | MAE$_1$ | MAE$_2$ | MAE$_3$ | Average MAE |
+|------------------|-----|------|---------|---------|-------|-------------|
+|AR(0) | `r ar0$aic` | `r ar0$sigma2` | `r ar0.cv[1]` | `r ar0.cv[2]` | `r ar0.cv[3]` | `r mean(ar0.cv)` |
+|AR(1) | `r ar1$aic` | `r ar1$sigma2` | `r ar1.cv[1]` | `r ar1.cv[2]` | `r ar1.cv[3]` | `r mean(ar1.cv)` |
+|AR(2) | `r ar2$aic` | `r ar2$sigma2` | `r ar2.cv[1]` | `r ar2.cv[2]` | `r ar2.cv[3]` | `r mean(ar2.cv)` |
+|MA(1) | `r ma1$aic` | `r ma1$sigma2` | `r ma1.cv[1]` | `r ma1.cv[2]` | `r ma1.cv[3]` | `r mean(ma1.cv)` |
+|ARMA(1,1) | `r arma11$aic` | `r arma11$sigma2` | `r arma11.cv[1]` | `r arma11.cv[2]` | `r arma11.cv[3]` | `r mean(arma11.cv)` |
