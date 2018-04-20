@@ -38,3 +38,39 @@ cv.1a <- arimaCV(death, order=c(1,0,1), forward=forward,
 table.names <- c("Model Components", "AIC", "\\hat{sigma}^2")
 
 pander(table.names)
+
+# Make a plot
+plot.new()
+par(usr = c(0, length(DemHouseMaj) + n.ahead, -50, 80) )
+# make the x-axis
+axis(1,
+     at = seq(from = 1, to = 31, by = 1),
+     labels = 88:118
+)
+axis(2)
+
+title(xlab = "Session of Congress",
+      ylab = "Size of Democratic House Majority",
+      main="Predicted effect of Scenario 1")
+
+
+# Polygon of predictive interval for no law (optional)
+x0 <- (length(DemHouseMaj)+1):(length(DemHouseMaj) + n.ahead)
+y0 <- c(ypred1$pred - 2*ypred1$se, rev(ypred1$pred + 2*ypred1$se), (ypred1$pred - 2*ypred1$se)[1] )
+polygon(x = c(x0, rev(x0), x0[1]),
+        y = y0,
+        border=NA,
+        col="#FFBFBFFF"
+)
+
+# Plot the actual data
+lines(x = 1:length(DemHouseMaj),
+      y = DemHouseMaj
+)
+
+# Add the predictions for no law
+lines(x = length(DemHouseMaj):(length(DemHouseMaj)+n.ahead),
+      y = c(DemHouseMaj[length(DemHouseMaj)],ypred1$pred),  # link up the actual data to the prediction
+      col = "red"
+)
+

@@ -1,7 +1,7 @@
 ---
 title: "Homework 2"
 author: "Austin Sell"
-date: "April 19, 2018"
+date: "May 1, 2018"
 output: pdf_document
 ---
 
@@ -11,6 +11,9 @@ attach(data)
 library(tseries)
 library(pander)
 library(forecast)
+library(simcf)
+library(tile)
+library(RColorBrewer)
 options(digits = 3)
 ```
 
@@ -59,11 +62,10 @@ pre1994$DemHouseMaj <- pre1994$DemHouseMaj - mean(pre1994$DemHouseMaj)
 post1994$DemHouseMaj <- post1994$DemHouseMaj - mean(post1994$DemHouseMaj)
 new.data <- rbind(pre1994, post1994)
 
-attach(new.data)
 
-plot(Congress, DemHouseMaj, type="l")
-acf(DemHouseMaj)
-pacf(DemHouseMaj)
+plot(new.data$Congress, new.data$DemHouseMaj, type="l")
+acf(new.data$DemHouseMaj)
+pacf(new.data$DemHouseMaj)
 ```
 
 ## Part B
@@ -132,6 +134,16 @@ ma1.cv <- arimaCV(DemHouseMaj, order = c(0,0,1), forward=3,
 
 arma11.cv <- arimaCV(DemHouseMaj, order = c(1,0,1), forward=3,
                   xreg=xcovariates, include.mean = TRUE, minper = 20)
+
+allCV <- cbind(ar0.cv, ar1.cv, ar2.cv, ma1.cv, arma11.cv)
+labs <- c("AR(0)", "AR(1)", "AR(2)", "MA(1)", "ARMA(1,1)")
+
+col <- c(brewer.pal(7, "Reds")[3:7],
+         brewer.pal(8, "Blues")[3:8])
+
+matplot(allCV, type="l", col=col, lty=1, ylab="Mean Absolute Error", xlab="Periods Forward",
+        main="Cross-validation of accident deaths models", xlim=c(0.75,3.75))
+text(labs, x=rep(3.5,length(labs)), y=allCV[nrow(allCV),], col=col)
 ```
 
 Table: Model Comparison
@@ -143,3 +155,68 @@ Table: Model Comparison
 |AR(2) | `r ar2$aic` | `r ar2$sigma2` | `r ar2.cv[1]` | `r ar2.cv[2]` | `r ar2.cv[3]` | `r mean(ar2.cv)` |
 |MA(1) | `r ma1$aic` | `r ma1$sigma2` | `r ma1.cv[1]` | `r ma1.cv[2]` | `r ma1.cv[3]` | `r mean(ma1.cv)` |
 |ARMA(1,1) | `r arma11$aic` | `r arma11$sigma2` | `r arma11.cv[1]` | `r arma11.cv[2]` | `r arma11.cv[3]` | `r mean(arma11.cv)` |
+
+AR(0) is best model
+
+## Part E
+
+```{r}
+n.ahead <- 3
+PartisanMidterm.cf <- c(-1,0,1)
+Unemployment.cf1 <- rep(4.6, n.ahead)
+Unemployment.cf2 <- rep(3.6, n.ahead)
+Unemployment.cf3 <- rep(5.6, n.ahead)
+PartisanUnem.cf1 <- c(-1,1,1)*Unemployment.cf1
+PartisanUnem.cf2 <- c(-1,1,1)*Unemployment.cf2
+PartisanUnem.cf3 <- c(-1,1,1)*Unemployment.cf3
+Coattails.cf <- c(0,1,0)
+Pre1994.cf <- rep(0, n.ahead)
+
+cf1.cov <- as.data.frame(cbind(PartisanMidterm.cf, PartisanUnem.cf1, Coattails.cf, Pre1994.cf))
+cf2.cov <- as.data.frame(cbind(PartisanMidterm.cf, PartisanUnem.cf2, Coattails.cf, Pre1994.cf))
+cf3.cov <- as.data.frame(cbind(PartisanMidterm.cf, PartisanUnem.cf3, Coattails.cf, Pre1994.cf))
+
+names(cf1.cov) <- c("PartisanMidterm", "PartisanUnem", "Coattails", "Pre1994")
+names(cf2.cov) <- c("PartisanMidterm", "PartisanUnem", "Coattails", "Pre1994")
+names(cf3.cov) <- c("PartisanMidterm", "PartisanUnem", "Coattails", "Pre1994")
+
+ypred1 <- predict(ar0, n.ahead=n.ahead, newxreg = cf1.cov)
+ypred2 <- predict(ar0, n.ahead=n.ahead, newxreg = cf2.cov)
+ypred3 <- predict(ar0, n.ahead=n.ahead, newxreg = cf3.cov)
+
+# Make a plot
+plot.new()
+par(usr = c(0, length(DemHouseMaj) + n.ahead, -50, 80) )
+# make the x-axis
+axis(1,
+     at = seq(from = 1, to = 31, by = 1),
+     labels = seq(from = 1963, to = 2023, by = 2)
+)
+axis(2)
+
+title(xlab = "Starting Year of Congressional Session",
+      ylab = "Size of Democratic House Majority",
+      main="Predicted effect of Scenario 1")
+
+
+# Polygon of predictive interval for no law (optional)
+x0 <- (length(DemHouseMaj)+1):(length(DemHouseMaj) + n.ahead)
+y0 <- c(ypred1$pred - 2*ypred1$se, rev(ypred1$pred + 2*ypred1$se), (ypred1$pred - 2*ypred1$se)[1] )
+polygon(x = c(x0, rev(x0), x0[1]),
+        y = y0,
+        border=NA,
+        col="#FFBFBFFF"
+)
+
+# Plot the actual data
+lines(x = 1:length(DemHouseMaj),
+      y = DemHouseMaj
+)
+
+# Add the predictions for no law
+lines(x = length(DemHouseMaj):(length(DemHouseMaj)+n.ahead),
+      y = c(DemHouseMaj[length(DemHouseMaj)],ypred1$pred),  # link up the actual data to the prediction
+      col = "red"
+)
+
+```
