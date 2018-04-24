@@ -219,4 +219,98 @@ lines(x = length(DemHouseMaj):(length(DemHouseMaj)+n.ahead),
       col = "red"
 )
 
+# Make a plot 2
+plot.new()
+par(usr = c(0, length(DemHouseMaj) + n.ahead, -50, 80) )
+# make the x-axis
+axis(1,
+     at = seq(from = 1, to = 31, by = 1),
+     labels = seq(from = 1963, to = 2023, by = 2)
+)
+axis(2)
+
+title(xlab = "Starting Year of Congressional Session",
+      ylab = "Size of Democratic House Majority",
+      main="Predicted effect of Scenario 2")
+
+
+# Polygon of predictive interval for no law (optional)
+x0 <- (length(DemHouseMaj)+1):(length(DemHouseMaj) + n.ahead)
+y0 <- c(ypred2$pred - 2*ypred2$se, rev(ypred2$pred + 2*ypred2$se), (ypred2$pred - 2*ypred2$se)[1] )
+polygon(x = c(x0, rev(x0), x0[1]),
+        y = y0,
+        border=NA,
+        col="#FFBFBFFF"
+)
+
+# Plot the actual data
+lines(x = 1:length(DemHouseMaj),
+      y = DemHouseMaj
+)
+
+# Add the predictions for no law
+lines(x = length(DemHouseMaj):(length(DemHouseMaj)+n.ahead),
+      y = c(DemHouseMaj[length(DemHouseMaj)],ypred2$pred),  # link up the actual data to the prediction
+      col = "red"
+)
+
+# Make a plot 3
+plot.new()
+par(usr = c(0, length(DemHouseMaj) + n.ahead, -50, 80) )
+# make the x-axis
+axis(1,
+     at = seq(from = 1, to = 31, by = 1),
+     labels = seq(from = 1963, to = 2023, by = 2)
+)
+axis(2)
+
+title(xlab = "Starting Year of Congressional Session",
+      ylab = "Size of Democratic House Majority",
+      main="Predicted effect of Scenario 3")
+
+
+# Polygon of predictive interval for no law (optional)
+x0 <- (length(DemHouseMaj)+1):(length(DemHouseMaj) + n.ahead)
+y0 <- c(ypred3$pred - 2*ypred3$se, rev(ypred3$pred + 2*ypred3$se), (ypred3$pred - 2*ypred3$se)[1] )
+polygon(x = c(x0, rev(x0), x0[1]),
+        y = y0,
+        border=NA,
+        col="#FFBFBFFF"
+)
+
+# Plot the actual data
+lines(x = 1:length(DemHouseMaj),
+      y = DemHouseMaj
+)
+
+# Add the predictions for no law
+lines(x = length(DemHouseMaj):(length(DemHouseMaj)+n.ahead),
+      y = c(DemHouseMaj[length(DemHouseMaj)],ypred3$pred),  # link up the actual data to the prediction
+      col = "red"
+)
+
 ```
+
+Table: Counterfactual Values
+
+| Variable | 2018 | 2020 | 2022 |
+|--------------|------|------|------|
+|**Scenario 1** | &nbsp; | &nbsp; | &nbsp; |
+|Partisan Midterm | `r PartisanMidterm.cf[1]` | `r PartisanMidterm.cf[2]` | `r PartisanMidterm.cf[3]` |
+|Partisan Unemployment | `r PartisanUnem.cf1[1]` | `r PartisanUnem.cf1[2]` | `r PartisanUnem.cf1[3]` |
+|Coattails | `r Coattails.cf[1]` | `r Coattails.cf[2]` | `r Coattails.cf[3]` |
+|Pre-1994 | `r Pre1994.cf[1]` | `r Pre1994.cf[2]` | `r Pre1994.cf[3]` |
+|&nbsp;|&nbsp;|&nbsp;|&nbsp;|
+|**Scenario 2** | &nbsp; | &nbsp; | &nbsp; |
+|Partisan Midterm | `r PartisanMidterm.cf[1]` | `r PartisanMidterm.cf[2]` | `r PartisanMidterm.cf[3]` |
+|Partisan Unemployment | `r PartisanUnem.cf2[1]` | `r PartisanUnem.cf2[2]` | `r PartisanUnem.cf2[3]` |
+|Coattails | `r Coattails.cf[1]` | `r Coattails.cf[2]` | `r Coattails.cf[3]` |
+|Pre-1994 | `r Pre1994.cf[1]` | `r Pre1994.cf[2]` | `r Pre1994.cf[3]` |
+|&nbsp;|&nbsp;|&nbsp;|&nbsp;|
+|**Scenario 3** | &nbsp; | &nbsp; | &nbsp; |
+|Partisan Midterm | `r PartisanMidterm.cf[1]` | `r PartisanMidterm.cf[2]` | `r PartisanMidterm.cf[3]` |
+|Partisan Unemployment | `r PartisanUnem.cf3[1]` | `r PartisanUnem.cf3[2]` | `r PartisanUnem.cf3[3]` |
+|Coattails | `r Coattails.cf[1]` | `r Coattails.cf[2]` | `r Coattails.cf[3]` |
+|Pre-1994 | `r Pre1994.cf[1]` | `r Pre1994.cf[2]` | `r Pre1994.cf[3]` |
+
+
