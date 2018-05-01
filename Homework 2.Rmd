@@ -5,7 +5,7 @@ date: "May 1, 2018"
 output: pdf_document
 ---
 
-```{r}
+```{r echo=FALSE, warning=FALSE}
 data <- read.csv("Data/congress.csv")
 attach(data)
 library(tseries)
@@ -47,22 +47,29 @@ arimaCV <- function(x, order, xreg, include.mean, forward=1, minper=50, seasonal
 
 ## Part A
 
-```{r}
-plot(Congress, DemHouseMaj, type="l")
+I begin by plotting the time series for the Democratic House Majority as well as its ACF and PACF. I also run the augmented Dickey-Fuller and Phillips-Perron tests for unit roots. The correlograms below indicate the possibility of a first order autoregressive process. The unit root tests disagree in their findings; the ADF cannot reject the hypothesis of nonstationarity, while the Phillips-Perron can.
+
+```{r echo=FALSE}
+plot(Congress, DemHouseMaj, type="l", main="House Democratic Majority over Time")
 
 acf(DemHouseMaj)
 pacf(DemHouseMaj)
 
 adf.test(DemHouseMaj)
 PP.test(DemHouseMaj)
+```
 
+I continue by examining the possibility of a structural break in the model at the year 1994. I demeaned the data by period, both before and after 1994, constructing a new dataset. The modified time series and ACF/PACF plots are below. After accounting for the structural break, there does not seem to be evidence of a AR or MA process. Any analysis of this time series should include a control for this break.
+
+```{r}
 pre1994 <- data[StartYear<1994,]
 post1994 <- data[StartYear>1994,]
 pre1994$DemHouseMaj <- pre1994$DemHouseMaj - mean(pre1994$DemHouseMaj)
 post1994$DemHouseMaj <- post1994$DemHouseMaj - mean(post1994$DemHouseMaj)
 new.data <- rbind(pre1994, post1994)
+```
 
-
+```{r echo=FALSE}
 plot(new.data$Congress, new.data$DemHouseMaj, type="l")
 acf(new.data$DemHouseMaj)
 pacf(new.data$DemHouseMaj)
@@ -70,8 +77,11 @@ pacf(new.data$DemHouseMaj)
 
 ## Part B
 
+I fit an AR(0) regression by defining the relevant covariates and estimating the model with arima. Notably, OLS would give the same coefficient estimates for this model (but different standard errors). Relevant model information is displayed in Table 1.
+
 ```{r}
 xcovariates <- cbind(PartisanMidterm, PartisanUnem, Coattails, Pre1994)
+
 ar0 <- arima(DemHouseMaj, order = c(0,0,0),
              xreg = xcovariates, include.mean = TRUE)
 ```
@@ -83,10 +93,12 @@ Model Components | AIC | $\hat{\sigma}^2$ | $N$ | $\hat{\beta}_{PM}$ | $\hat{\be
 AR(0) | `r ar0$aic` | `r ar0$sigma2` | `r length(DemHouseMaj)` | `r ar0$coef["PartisanMidterm"]` | `r ar0$coef["PartisanUnem"]` | `r ar0$coef["Coattails"]` | `r ar0$coef["Pre1994"]` |
 &nbsp; | &nbsp; | &nbsp; | &nbsp; | (`r sqrt(diag(ar0$var.coef))["PartisanMidterm"]`) | (`r sqrt(diag(ar0$var.coef))["PartisanUnem"]`) | (`r sqrt(diag(ar0$var.coef))["Coattails"]`) | (`r sqrt(diag(ar0$var.coef))["Pre1994"]`) |
 
-
+The AR(0) model suggests that the House Democratic majority decreases by `r abs(ar0$coef["PartisanMidterms"])` after midterms with a Democratic presidency, compared to non-midterm elections. The effect is in the opposite direction when there is a Republican president. 
 
 
 ## Part C
+
+
 
 ```{r}
 ar1 <- arima(DemHouseMaj, order = c(1,0,0),
@@ -142,7 +154,7 @@ col <- c(brewer.pal(7, "Reds")[3:7],
          brewer.pal(8, "Blues")[3:8])
 
 matplot(allCV, type="l", col=col, lty=1, ylab="Mean Absolute Error", xlab="Periods Forward",
-        main="Cross-validation of accident deaths models", xlim=c(0.75,3.75))
+        main="Cross-validation of House Democratic Majority models", xlim=c(0.75,3.75))
 text(labs, x=rep(3.5,length(labs)), y=allCV[nrow(allCV),], col=col)
 ```
 
@@ -150,11 +162,11 @@ Table: Model Comparison
 
 | Model Components | AIC | RMSE | MAE$_1$ | MAE$_2$ | MAE$_3$ | Average MAE |
 |------------------|-----|------|---------|---------|-------|-------------|
-|AR(0) | `r ar0$aic` | `r ar0$sigma2` | `r ar0.cv[1]` | `r ar0.cv[2]` | `r ar0.cv[3]` | `r mean(ar0.cv)` |
-|AR(1) | `r ar1$aic` | `r ar1$sigma2` | `r ar1.cv[1]` | `r ar1.cv[2]` | `r ar1.cv[3]` | `r mean(ar1.cv)` |
-|AR(2) | `r ar2$aic` | `r ar2$sigma2` | `r ar2.cv[1]` | `r ar2.cv[2]` | `r ar2.cv[3]` | `r mean(ar2.cv)` |
-|MA(1) | `r ma1$aic` | `r ma1$sigma2` | `r ma1.cv[1]` | `r ma1.cv[2]` | `r ma1.cv[3]` | `r mean(ma1.cv)` |
-|ARMA(1,1) | `r arma11$aic` | `r arma11$sigma2` | `r arma11.cv[1]` | `r arma11.cv[2]` | `r arma11.cv[3]` | `r mean(arma11.cv)` |
+|AR(0) | `r ar0$aic` | `r sqrt(ar0$sigma2)` | `r ar0.cv[1]` | `r ar0.cv[2]` | `r ar0.cv[3]` | `r mean(ar0.cv)` |
+|AR(1) | `r ar1$aic` | `r sqrt(ar1$sigma2)` | `r ar1.cv[1]` | `r ar1.cv[2]` | `r ar1.cv[3]` | `r mean(ar1.cv)` |
+|AR(2) | `r ar2$aic` | `r sqrt(ar2$sigma2)` | `r ar2.cv[1]` | `r ar2.cv[2]` | `r ar2.cv[3]` | `r mean(ar2.cv)` |
+|MA(1) | `r ma1$aic` | `r sqrt(ma1$sigma2)` | `r ma1.cv[1]` | `r ma1.cv[2]` | `r ma1.cv[3]` | `r mean(ma1.cv)` |
+|ARMA(1,1) | `r arma11$aic` | `r sqrt(arma11$sigma2)` | `r arma11.cv[1]` | `r arma11.cv[2]` | `r arma11.cv[3]` | `r mean(arma11.cv)` |
 
 AR(0) is best model
 
@@ -163,12 +175,12 @@ AR(0) is best model
 ```{r}
 n.ahead <- 3
 PartisanMidterm.cf <- c(-1,0,1)
-Unemployment.cf1 <- rep(4.6, n.ahead)
-Unemployment.cf2 <- rep(3.6, n.ahead)
-Unemployment.cf3 <- rep(5.6, n.ahead)
-PartisanUnem.cf1 <- c(-1,1,1)*Unemployment.cf1
-PartisanUnem.cf2 <- c(-1,1,1)*Unemployment.cf2
-PartisanUnem.cf3 <- c(-1,1,1)*Unemployment.cf3
+UnemDeviation.cf1 <- rep(4.6, n.ahead) - 6.075
+UnemDeviation.cf2 <- rep(3.6, n.ahead) - 6.075
+UnemDeviation.cf3 <- rep(5.6, n.ahead) - 6.075
+PartisanUnem.cf1 <- c(-1,1,1)*UnemDeviation.cf1
+PartisanUnem.cf2 <- c(-1,1,1)*UnemDeviation.cf2
+PartisanUnem.cf3 <- c(-1,1,1)*UnemDeviation.cf3
 Coattails.cf <- c(0,1,0)
 Pre1994.cf <- rep(0, n.ahead)
 
@@ -313,4 +325,139 @@ Table: Counterfactual Values
 |Coattails | `r Coattails.cf[1]` | `r Coattails.cf[2]` | `r Coattails.cf[3]` |
 |Pre-1994 | `r Pre1994.cf[1]` | `r Pre1994.cf[2]` | `r Pre1994.cf[3]` |
 
+# Question 2
 
+## Part A
+
+```{r}
+plot(Congress, DemSenateMaj, type="l")
+
+acf(DemSenateMaj)
+pacf(DemSenateMaj)
+
+adf.test(DemSenateMaj)
+PP.test(DemSenateMaj)
+
+pre1994 <- data[StartYear<1994,]
+post1994 <- data[StartYear>1994,]
+pre1994$DemSenateMaj <- pre1994$DemSenateMaj - mean(pre1994$DemSenateMaj)
+post1994$DemSenateMaj <- post1994$DemSenateMaj - mean(post1994$DemSenateMaj)
+new.data <- rbind(pre1994, post1994)
+
+
+plot(new.data$Congress, new.data$DemSenateMaj, type="l")
+acf(new.data$DemSenateMaj)
+pacf(new.data$DemSenateMaj)
+```
+
+## Part B
+
+```{r}
+xcovariates <- cbind(PartisanMidterm, PartisanUnem, Coattails, Pre1994)
+ar0 <- arima(DemSenateMaj, order = c(0,0,0),
+             xreg = xcovariates, include.mean = TRUE)
+
+ar1 <- arima(DemSenateMaj, order = c(1,0,0),
+             xreg = xcovariates, include.mean = TRUE)
+
+ar2 <- arima(DemSenateMaj, order = c(2,0,0),
+             xreg = xcovariates, include.mean = TRUE)
+
+ma1 <- arima(DemSenateMaj, order = c(0,0,1),
+             xreg = xcovariates, include.mean = TRUE)
+
+arma11 <- arima(DemSenateMaj, order = c(1,0,1),
+             xreg = xcovariates, include.mean = TRUE)
+```
+
+Table: Model Comparison
+
+Model Components | AIC | $\hat{\sigma}^2$ | $N$ | $\hat{\beta}_{PM}$ | $\hat{\beta}_{PU}$ | $\hat{\beta}_{CT}$ | $\hat{\beta}_{1994}$ | 
+------------------|-----|-----|---|-----|-----|-----|-----|
+AR(0) | `r ar0$aic` | `r ar0$sigma2`| `r length(DemHouseMaj)` | `r ar0$coef["PartisanMidterm"]` | `r ar0$coef["PartisanUnem"]` | `r ar0$coef["Coattails"]` | `r ar0$coef["Pre1994"]` |
+&nbsp; | &nbsp; | &nbsp; | &nbsp; | (`r sqrt(diag(ar0$var.coef))["PartisanMidterm"]`) | (`r sqrt(diag(ar0$var.coef))["PartisanUnem"]`) | (`r sqrt(diag(ar0$var.coef))["Coattails"]`) | (`r sqrt(diag(ar0$var.coef))["Pre1994"]`) |
+AR(1) | `r ar1$aic` | `r ar1$sigma2` | `r length(DemHouseMaj)` | `r ar1$coef["PartisanMidterm"]` | `r ar1$coef["PartisanUnem"]` | `r ar1$coef["Coattails"]` | `r ar1$coef["Pre1994"]` |
+&nbsp; | &nbsp; | &nbsp; | &nbsp; | (`r sqrt(diag(ar1$var.coef))["PartisanMidterm"]`) | (`r sqrt(diag(ar1$var.coef))["PartisanUnem"]`) | (`r sqrt(diag(ar1$var.coef))["Coattails"]`) | (`r sqrt(diag(ar1$var.coef))["Pre1994"]`) |
+AR(2) | `r ar0$aic` | `r ar2$sigma2` | `r length(DemHouseMaj)` | `r ar2$coef["PartisanMidterm"]` | `r ar2$coef["PartisanUnem"]` | `r ar2$coef["Coattails"]` | `r ar2$coef["Pre1994"]` |
+&nbsp; | &nbsp; | &nbsp; | &nbsp; | (`r sqrt(diag(ar2$var.coef))["PartisanMidterm"]`) | (`r sqrt(diag(ar2$var.coef))["PartisanUnem"]`) | (`r sqrt(diag(ar2$var.coef))["Coattails"]`) | (`r sqrt(diag(ar2$var.coef))["Pre1994"]`) |
+MA(1) | `r ma1$aic` | `r ma1$sigma2` | `r length(DemHouseMaj)` | `r ma1$coef["PartisanMidterm"]` | `r ma1$coef["PartisanUnem"]` | `r ma1$coef["Coattails"]` | `r ma1$coef["Pre1994"]` |
+&nbsp; | &nbsp; | &nbsp; | &nbsp; | (`r sqrt(diag(ma1$var.coef))["PartisanMidterm"]`) | (`r sqrt(diag(ma1$var.coef))["PartisanUnem"]`) | (`r sqrt(diag(ma1$var.coef))["Coattails"]`) | (`r sqrt(diag(ma1$var.coef))["Pre1994"]`) |
+ARMA(1,1) | `r arma11$aic` | `r arma11$sigma2` | `r length(DemHouseMaj)` | `r arma11$coef["PartisanMidterm"]` | `r arma11$coef[3]` | `r arma11$coef["Coattails"]` | `r arma11$coef["Pre1994"]` |
+&nbsp; | &nbsp; | &nbsp; | &nbsp; | (`r sqrt(diag(arma11$var.coef))["PartisanMidterm"]`) | (`r sqrt(diag(arma11$var.coef))["PartisanUnem"]`) | (`r sqrt(diag(arma11$var.coef))["Coattails"]`) | (`r sqrt(diag(arma11$var.coef))["Pre1994"]`) |
+
+```{r}
+ar0.cv <- arimaCV(DemSenateMaj, order = c(0,0,0), forward=3,
+                  xreg=xcovariates, include.mean = TRUE, minper = 20)
+
+ar1.cv <- arimaCV(DemSenateMaj, order = c(1,0,0), forward=3,
+                  xreg=xcovariates, include.mean = TRUE, minper = 20)
+
+ar2.cv <- arimaCV(DemSenateMaj, order = c(2,0,0), forward=3,
+                  xreg=xcovariates, include.mean = TRUE, minper = 20)
+
+ma1.cv <- arimaCV(DemSenateMaj, order = c(0,0,1), forward=3,
+                  xreg=xcovariates, include.mean = TRUE, minper = 20)
+
+arma11.cv <- arimaCV(DemSenateMaj, order = c(1,0,1), forward=3,
+                  xreg=xcovariates, include.mean = TRUE, minper = 20)
+
+allCV <- cbind(ar0.cv, ar1.cv, ar2.cv, ma1.cv, arma11.cv)
+labs <- c("AR(0)", "AR(1)", "AR(2)", "MA(1)", "ARMA(1,1)")
+
+col <- c(brewer.pal(7, "Reds")[3:7],
+         brewer.pal(8, "Blues")[3:8])
+
+matplot(allCV, type="l", col=col, lty=1, ylab="Mean Absolute Error", xlab="Periods Forward",
+        main="Cross-validation of Senate Democratic Majority models", xlim=c(0.75,3.75))
+text(labs, x=rep(3.5,length(labs)), y=allCV[nrow(allCV),], col=col)
+```
+
+Table: Model Comparison
+
+| Model Components | AIC | RMSE | MAE$_1$ | MAE$_2$ | MAE$_3$ | Average MAE |
+|------------------|-----|------|---------|---------|-------|-------------|
+|AR(0) | `r ar0$aic` | `r sqrt(ar0$sigma2)` | `r ar0.cv[1]` | `r ar0.cv[2]` | `r ar0.cv[3]` | `r mean(ar0.cv)` |
+|AR(1) | `r ar1$aic` | `r sqrt(ar1$sigma2)` | `r ar1.cv[1]` | `r ar1.cv[2]` | `r ar1.cv[3]` | `r mean(ar1.cv)` |
+|AR(2) | `r ar2$aic` | `r sqrt(ar2$sigma2)` | `r ar2.cv[1]` | `r ar2.cv[2]` | `r ar2.cv[3]` | `r mean(ar2.cv)` |
+|MA(1) | `r ma1$aic` | `r sqrt(ma1$sigma2)` | `r ma1.cv[1]` | `r ma1.cv[2]` | `r ma1.cv[3]` | `r mean(ma1.cv)` |
+|ARMA(1,1) | `r arma11$aic` | `r sqrt(arma11$sigma2)` | `r arma11.cv[1]` | `r arma11.cv[2]` | `r arma11.cv[3]` | `r mean(arma11.cv)` |
+
+## Part C
+
+```{r}
+ar1ar1.3 <- arima(DemSenateMaj, order = c(1,0,0),
+                  seasonal = list(order = c(1,0,0), period = 3),
+                  xreg = xcovariates, include.mean = TRUE)
+
+ar1ar1.3.cv <- arimaCV(DemSenateMaj, order = c(1,0,0), forward=3,
+                       seasonal = list(order= c(1,0,0), period=3),
+                  xreg=xcovariates, include.mean = TRUE, minper = 20)
+```
+
+Table: Model Comparison
+
+Model Components | AIC | $\hat{\sigma}^2$ | $N$ | $\hat{\beta}_{PM}$ | $\hat{\beta}_{PU}$ | $\hat{\beta}_{CT}$ | $\hat{\beta}_{1994}$ | 
+------------------|-----|-----|---|-----|-----|-----|-----|
+AR(0) | `r ar0$aic` | `r ar0$sigma2`| `r length(DemSenateMaj)` | `r ar0$coef["PartisanMidterm"]` | `r ar0$coef["PartisanUnem"]` | `r ar0$coef["Coattails"]` | `r ar0$coef["Pre1994"]` |
+&nbsp; | &nbsp; | &nbsp; | &nbsp; | (`r sqrt(diag(ar0$var.coef))["PartisanMidterm"]`) | (`r sqrt(diag(ar0$var.coef))["PartisanUnem"]`) | (`r sqrt(diag(ar0$var.coef))["Coattails"]`) | (`r sqrt(diag(ar0$var.coef))["Pre1994"]`) |
+AR(1) | `r ar1$aic` | `r ar1$sigma2` | `r length(DemSenateMaj)` | `r ar1$coef["PartisanMidterm"]` | `r ar1$coef["PartisanUnem"]` | `r ar1$coef["Coattails"]` | `r ar1$coef["Pre1994"]` |
+&nbsp; | &nbsp; | &nbsp; | &nbsp; | (`r sqrt(diag(ar1$var.coef))["PartisanMidterm"]`) | (`r sqrt(diag(ar1$var.coef))["PartisanUnem"]`) | (`r sqrt(diag(ar1$var.coef))["Coattails"]`) | (`r sqrt(diag(ar1$var.coef))["Pre1994"]`) |
+AR(2) | `r ar0$aic` | `r ar2$sigma2` | `r length(DemSenateMaj)` | `r ar2$coef["PartisanMidterm"]` | `r ar2$coef["PartisanUnem"]` | `r ar2$coef["Coattails"]` | `r ar2$coef["Pre1994"]` |
+&nbsp; | &nbsp; | &nbsp; | &nbsp; | (`r sqrt(diag(ar2$var.coef))["PartisanMidterm"]`) | (`r sqrt(diag(ar2$var.coef))["PartisanUnem"]`) | (`r sqrt(diag(ar2$var.coef))["Coattails"]`) | (`r sqrt(diag(ar2$var.coef))["Pre1994"]`) |
+MA(1) | `r ma1$aic` | `r ma1$sigma2` | `r length(DemSenateMaj)` | `r ma1$coef["PartisanMidterm"]` | `r ma1$coef["PartisanUnem"]` | `r ma1$coef["Coattails"]` | `r ma1$coef["Pre1994"]` |
+&nbsp; | &nbsp; | &nbsp; | &nbsp; | (`r sqrt(diag(ma1$var.coef))["PartisanMidterm"]`) | (`r sqrt(diag(ma1$var.coef))["PartisanUnem"]`) | (`r sqrt(diag(ma1$var.coef))["Coattails"]`) | (`r sqrt(diag(ma1$var.coef))["Pre1994"]`) |
+ARMA(1,1) | `r arma11$aic` | `r arma11$sigma2` | `r length(DemSenateMaj)` | `r arma11$coef["PartisanMidterm"]` | `r arma11$coef[3]` | `r arma11$coef["Coattails"]` | `r arma11$coef["Pre1994"]` |
+&nbsp; | &nbsp; | &nbsp; | &nbsp; | (`r sqrt(diag(arma11$var.coef))["PartisanMidterm"]`) | (`r sqrt(diag(arma11$var.coef))["PartisanUnem"]`) | (`r sqrt(diag(arma11$var.coef))["Coattails"]`) | (`r sqrt(diag(arma11$var.coef))["Pre1994"]`) |
+AR(1)AR(1)$_3$ | `r ar1ar1.3$aic` | `r ar1ar1.3$sigma2` | `r length(DemSenateMaj)` | `r ar1ar1.3$coef["PartisanMidterm"]` | `r ar1ar1.3$coef["PartisanUnem"]` | `r ar1ar1.3$coef["Coattails"]` | `r ar1ar1.3$coef["Pre1994"]` |
+&nbsp; | &nbsp; | &nbsp; | &nbsp; | (`r sqrt(diag(ar1ar1.3$var.coef))["PartisanMidterm"]`) | (`r sqrt(diag(ar1ar1.3$var.coef))["PartisanUnem"]`) | (`r sqrt(diag(ar1ar1.3$var.coef))["Coattails"]`) | (`r sqrt(diag(ar1ar1.3$var.coef))["Pre1994"]`) |
+
+Table: Model Comparison
+
+| Model Components | AIC | RMSE | MAE$_1$ | MAE$_2$ | MAE$_3$ | Average MAE |
+|------------------|-----|------|---------|---------|-------|-------------|
+|AR(0) | `r ar0$aic` | `r ar0$sigma2` | `r ar0.cv[1]` | `r ar0.cv[2]` | `r ar0.cv[3]` | `r mean(ar0.cv)` |
+|AR(1) | `r ar1$aic` | `r ar1$sigma2` | `r ar1.cv[1]` | `r ar1.cv[2]` | `r ar1.cv[3]` | `r mean(ar1.cv)` |
+|AR(2) | `r ar2$aic` | `r ar2$sigma2` | `r ar2.cv[1]` | `r ar2.cv[2]` | `r ar2.cv[3]` | `r mean(ar2.cv)` |
+|MA(1) | `r ma1$aic` | `r ma1$sigma2` | `r ma1.cv[1]` | `r ma1.cv[2]` | `r ma1.cv[3]` | `r mean(ma1.cv)` |
+|ARMA(1,1) | `r arma11$aic` | `r arma11$sigma2` | `r arma11.cv[1]` | `r arma11.cv[2]` | `r arma11.cv[3]` | `r mean(arma11.cv)` |
+|AR(1)AR(1)$_3$ | `r ar1ar1.3$aic` | `r ar1ar1.3$sigma2` | `r ar1ar1.3.cv[1]` | `r ar1ar1.3.cv[2]` | `r ar1ar1.3.cv[3]` | `r mean(ar1ar1.3.cv)` |
