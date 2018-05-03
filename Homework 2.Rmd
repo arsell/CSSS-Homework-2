@@ -1,11 +1,11 @@
 ---
 title: "Homework 2"
 author: "Austin Sell"
-date: "May 1, 2018"
+date: "May 3, 2018"
 output: pdf_document
 ---
 
-```{r echo=FALSE, warning=FALSE}
+```{r echo=FALSE, warning=FALSE, message=FALSE}
 data <- read.csv("Data/congress.csv")
 attach(data)
 library(tseries)
@@ -50,8 +50,9 @@ arimaCV <- function(x, order, xreg, include.mean, forward=1, minper=50, seasonal
 I begin by plotting the time series for the Democratic House Majority as well as its ACF and PACF. I also run the augmented Dickey-Fuller and Phillips-Perron tests for unit roots. The correlograms below indicate the possibility of a first order autoregressive process. The unit root tests disagree in their findings; the ADF cannot reject the hypothesis of nonstationarity, while the Phillips-Perron can.
 
 ```{r echo=FALSE}
-plot(Congress, DemHouseMaj, type="l", main="House Democratic Majority over Time")
 
+layout(matrix(c(1,1,2,3), 2, 2, byrow = TRUE))
+plot(Congress, DemHouseMaj, type="l", main="House Democratic Majority over Time")
 acf(DemHouseMaj)
 pacf(DemHouseMaj)
 
@@ -59,7 +60,9 @@ adf.test(DemHouseMaj)
 PP.test(DemHouseMaj)
 ```
 
+
 I continue by examining the possibility of a structural break in the model at the year 1994. I demeaned the data by period, both before and after 1994, constructing a new dataset. The modified time series and ACF/PACF plots are below. After accounting for the structural break, there does not seem to be evidence of a AR or MA process. Any analysis of this time series should include a control for this break.
+
 
 ```{r}
 pre1994 <- data[StartYear<1994,]
@@ -70,7 +73,8 @@ new.data <- rbind(pre1994, post1994)
 ```
 
 ```{r echo=FALSE}
-plot(new.data$Congress, new.data$DemHouseMaj, type="l")
+layout(matrix(c(1,1,2,3), 2, 2, byrow = TRUE))
+plot(new.data$Congress, new.data$DemHouseMaj, type="l", main="House Democratic Majority over Time (Demeaned)")
 acf(new.data$DemHouseMaj)
 pacf(new.data$DemHouseMaj)
 ```
@@ -93,7 +97,7 @@ Model Components | AIC | $\hat{\sigma}^2$ | $N$ | $\hat{\beta}_{PM}$ | $\hat{\be
 AR(0) | `r ar0$aic` | `r ar0$sigma2` | `r length(DemHouseMaj)` | `r ar0$coef["PartisanMidterm"]` | `r ar0$coef["PartisanUnem"]` | `r ar0$coef["Coattails"]` | `r ar0$coef["Pre1994"]` |
 &nbsp; | &nbsp; | &nbsp; | &nbsp; | (`r sqrt(diag(ar0$var.coef))["PartisanMidterm"]`) | (`r sqrt(diag(ar0$var.coef))["PartisanUnem"]`) | (`r sqrt(diag(ar0$var.coef))["Coattails"]`) | (`r sqrt(diag(ar0$var.coef))["Pre1994"]`) |
 
-The AR(0) model suggests that the House Democratic majority decreases by `r abs(ar0$coef["PartisanMidterms"])` after midterms with a Democratic presidency, compared to non-midterm elections. The effect is in the opposite direction when there is a Republican president. 
+The AR(0) model suggests that the House Democratic majority was much higher in the sessions before our structural break in 1994, as expected. There is also a substantial coattail effect, with Democrats increasing their majority by about 18 seats when the Presidency switches from a Republican to a Democratic.
 
 
 ## Part C
@@ -129,6 +133,9 @@ MA(1) | `r ma1$aic` | `r ma1$sigma2` | `r length(DemHouseMaj)` | `r ma1$coef["Pa
 ARMA(1,1) | `r arma11$aic` | `r arma11$sigma2` | `r length(DemHouseMaj)` | `r arma11$coef["PartisanMidterm"]` | `r arma11$coef[3]` | `r arma11$coef["Coattails"]` | `r arma11$coef["Pre1994"]` |
 &nbsp; | &nbsp; | &nbsp; | &nbsp; | (`r sqrt(diag(arma11$var.coef))["PartisanMidterm"]`) | (`r sqrt(diag(arma11$var.coef))["PartisanUnem"]`) | (`r sqrt(diag(arma11$var.coef))["Coattails"]`) | (`r sqrt(diag(arma11$var.coef))["Pre1994"]`) |
 
+
+Substantively, all of the models are fairly similar in terms of their coefficient estimates. In terms of in-sample model fit, the ARMA(1,1) model does the best, although none of the models seems to perform particularly poorly in terms of AIC. Adding additional terms (either AR or MA), lowers $\hat{\sigma}^2$ which is not surprising. 
+
 ## Part D
 
 ```{r}
@@ -146,7 +153,9 @@ ma1.cv <- arimaCV(DemHouseMaj, order = c(0,0,1), forward=3,
 
 arma11.cv <- arimaCV(DemHouseMaj, order = c(1,0,1), forward=3,
                   xreg=xcovariates, include.mean = TRUE, minper = 20)
+```
 
+```{r echo=FALSE}
 allCV <- cbind(ar0.cv, ar1.cv, ar2.cv, ma1.cv, arma11.cv)
 labs <- c("AR(0)", "AR(1)", "AR(2)", "MA(1)", "ARMA(1,1)")
 
@@ -168,11 +177,13 @@ Table: Model Comparison
 |MA(1) | `r ma1$aic` | `r sqrt(ma1$sigma2)` | `r ma1.cv[1]` | `r ma1.cv[2]` | `r ma1.cv[3]` | `r mean(ma1.cv)` |
 |ARMA(1,1) | `r arma11$aic` | `r sqrt(arma11$sigma2)` | `r arma11.cv[1]` | `r arma11.cv[2]` | `r arma11.cv[3]` | `r mean(arma11.cv)` |
 
-AR(0) is best model
+Using rolling cross-validation, we can see that the AR(0) model is actually the best model, even though it doesn't have the best in-sample fit. The AR(2) model comes close, but the AR(0) is the overall best performance and it is supported by the correlograms that we constructed that found no evidence of AR processes after taking into account the structural break.
 
 ## Part E
 
-```{r}
+The predicted effects of each of the three scenarios, as well as a table of counterfactual values, are below.
+
+```{r echo=FALSE}
 n.ahead <- 3
 PartisanMidterm.cf <- c(-1,0,1)
 UnemDeviation.cf1 <- rep(4.6, n.ahead) - 6.075
@@ -196,6 +207,8 @@ ypred1 <- predict(ar0, n.ahead=n.ahead, newxreg = cf1.cov)
 ypred2 <- predict(ar0, n.ahead=n.ahead, newxreg = cf2.cov)
 ypred3 <- predict(ar0, n.ahead=n.ahead, newxreg = cf3.cov)
 
+
+par(mfrow=c(2,2))
 # Make a plot
 plot.new()
 par(usr = c(0, length(DemHouseMaj) + n.ahead, -50, 80) )
@@ -325,13 +338,15 @@ Table: Counterfactual Values
 |Coattails | `r Coattails.cf[1]` | `r Coattails.cf[2]` | `r Coattails.cf[3]` |
 |Pre-1994 | `r Pre1994.cf[1]` | `r Pre1994.cf[2]` | `r Pre1994.cf[3]` |
 
+All three secnarios predict an increase in Democratic seats in the 2018 midterm, followed by another increase in 2020 (assuming a Democratic president wins), and then a decrease in 2022 midterm. The exact predicted amount varies slightly because of the different levels of unemployment, but that difference doesn't appear to be enough to be significant. The main driver of the predictions seems to be the spike in 2020 due to the coattail effect.
+
 # Question 2
 
 ## Part A
 
 ```{r}
-plot(Congress, DemSenateMaj, type="l")
-
+layout(matrix(c(1,1,2,3), 2, 2, byrow = TRUE))
+plot(Congress, DemSenateMaj, type="l", main="Senate Democratic Majority over Time")
 acf(DemSenateMaj)
 pacf(DemSenateMaj)
 
@@ -344,15 +359,17 @@ pre1994$DemSenateMaj <- pre1994$DemSenateMaj - mean(pre1994$DemSenateMaj)
 post1994$DemSenateMaj <- post1994$DemSenateMaj - mean(post1994$DemSenateMaj)
 new.data <- rbind(pre1994, post1994)
 
-
-plot(new.data$Congress, new.data$DemSenateMaj, type="l")
+layout(matrix(c(1,1,2,3), 2, 2, byrow = TRUE))
+plot(new.data$Congress, new.data$DemSenateMaj, type="l", main="Senate Democratic Majority over Time (Demeaned)")
 acf(new.data$DemSenateMaj)
 pacf(new.data$DemSenateMaj)
 ```
 
+There does seem to be some evidence of a structural break. After demeaning the data, the underlying process looks to be an AR(1). 
+
 ## Part B
 
-```{r}
+```{r echo=FALSE}
 xcovariates <- cbind(PartisanMidterm, PartisanUnem, Coattails, Pre1994)
 ar0 <- arima(DemSenateMaj, order = c(0,0,0),
              xreg = xcovariates, include.mean = TRUE)
@@ -385,7 +402,9 @@ MA(1) | `r ma1$aic` | `r ma1$sigma2` | `r length(DemHouseMaj)` | `r ma1$coef["Pa
 ARMA(1,1) | `r arma11$aic` | `r arma11$sigma2` | `r length(DemHouseMaj)` | `r arma11$coef["PartisanMidterm"]` | `r arma11$coef[3]` | `r arma11$coef["Coattails"]` | `r arma11$coef["Pre1994"]` |
 &nbsp; | &nbsp; | &nbsp; | &nbsp; | (`r sqrt(diag(arma11$var.coef))["PartisanMidterm"]`) | (`r sqrt(diag(arma11$var.coef))["PartisanUnem"]`) | (`r sqrt(diag(arma11$var.coef))["Coattails"]`) | (`r sqrt(diag(arma11$var.coef))["Pre1994"]`) |
 
-```{r}
+The best model from in-sample tests appears to be the ARMA(1,1), but again we run the chance that the model may have overfit the data. Cross-validation techniques will help us figure out which model is actually most reliable. Substantively, only the indicator of the structural break in 1994 is significant across the models. This suggests that while there was a meaningful change in the Senate in 1994 as there was in the House, for the most part Senators are insulated from the other factors that have stronger effects on House elections. This makes sense as only a third of the Senate is up for reelection at a time, so the previous majority share is likely a good predictor of the next majority share.
+
+```{r echo=FALSE}
 ar0.cv <- arimaCV(DemSenateMaj, order = c(0,0,0), forward=3,
                   xreg=xcovariates, include.mean = TRUE, minper = 20)
 
@@ -400,7 +419,9 @@ ma1.cv <- arimaCV(DemSenateMaj, order = c(0,0,1), forward=3,
 
 arma11.cv <- arimaCV(DemSenateMaj, order = c(1,0,1), forward=3,
                   xreg=xcovariates, include.mean = TRUE, minper = 20)
+```
 
+```{r echo=FALSE}
 allCV <- cbind(ar0.cv, ar1.cv, ar2.cv, ma1.cv, arma11.cv)
 labs <- c("AR(0)", "AR(1)", "AR(2)", "MA(1)", "ARMA(1,1)")
 
@@ -421,6 +442,8 @@ Table: Model Comparison
 |AR(2) | `r ar2$aic` | `r sqrt(ar2$sigma2)` | `r ar2.cv[1]` | `r ar2.cv[2]` | `r ar2.cv[3]` | `r mean(ar2.cv)` |
 |MA(1) | `r ma1$aic` | `r sqrt(ma1$sigma2)` | `r ma1.cv[1]` | `r ma1.cv[2]` | `r ma1.cv[3]` | `r mean(ma1.cv)` |
 |ARMA(1,1) | `r arma11$aic` | `r sqrt(arma11$sigma2)` | `r arma11.cv[1]` | `r arma11.cv[2]` | `r arma11.cv[3]` | `r mean(arma11.cv)` |
+
+Using cross-validation techniques, the AR(1) model stands out as the best fitting model. As explained above, this makes theoretical sense as 2/3 of the Senate stays the same for each new session.
 
 ## Part C
 
@@ -461,3 +484,5 @@ Table: Model Comparison
 |MA(1) | `r ma1$aic` | `r ma1$sigma2` | `r ma1.cv[1]` | `r ma1.cv[2]` | `r ma1.cv[3]` | `r mean(ma1.cv)` |
 |ARMA(1,1) | `r arma11$aic` | `r arma11$sigma2` | `r arma11.cv[1]` | `r arma11.cv[2]` | `r arma11.cv[3]` | `r mean(arma11.cv)` |
 |AR(1)AR(1)$_3$ | `r ar1ar1.3$aic` | `r ar1ar1.3$sigma2` | `r ar1ar1.3.cv[1]` | `r ar1ar1.3.cv[2]` | `r ar1ar1.3.cv[3]` | `r mean(ar1ar1.3.cv)` |
+
+The new model does not outperform the AR(1) model. Overall, it doesn't even rank in the top half of the models we fit based on MAE. There's certainly a theoretical reason why the AR(1)AR(1)$_3$ model might fit in the Senate. As explained previously, only a third of the Senate is up for reelection every year, so a 3-period seasonal cycle would capture any recurring "cohort" patterns. This is a pattern that wouldn't make sense in the House. However, ultimately we don't see strong evidence of such a pattern and the AR(1) remains the best model.
